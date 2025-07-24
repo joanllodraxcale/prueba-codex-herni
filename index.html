@@ -36,11 +36,44 @@
     light.position.set(0, 20, 0);
     scene.add(light);
 
-    const groundGeo = new THREE.PlaneGeometry(100, 100);
-    const groundMat = new THREE.MeshStandardMaterial({ color: 0x654321 });
+    // create grassy ground similar to Bob-omb Battlefield
+    const groundGeo = new THREE.PlaneGeometry(200, 200);
+    const groundMat = new THREE.MeshStandardMaterial({ color: 0x55aa55 });
     const ground = new THREE.Mesh(groundGeo, groundMat);
     ground.rotation.x = -Math.PI / 2;
     scene.add(ground);
+
+    // simple path through the level
+    const pathGeo = new THREE.PlaneGeometry(5, 60);
+    const pathMat = new THREE.MeshStandardMaterial({ color: 0x8b4513 });
+    const path = new THREE.Mesh(pathGeo, pathMat);
+    path.rotation.x = -Math.PI / 2;
+    path.position.z = -20;
+    scene.add(path);
+
+    // large mountain in the distance
+    const mountainGeo = new THREE.ConeGeometry(10, 20, 8);
+    const mountainMat = new THREE.MeshStandardMaterial({ color: 0x808080 });
+    const mountain = new THREE.Mesh(mountainGeo, mountainMat);
+    mountain.position.set(0, 10, -50);
+    scene.add(mountain);
+
+    // small castle at the start area
+    const castleGeo = new THREE.BoxGeometry(10, 5, 5);
+    const castleMat = new THREE.MeshStandardMaterial({ color: 0xdddddd });
+    const castle = new THREE.Mesh(castleGeo, castleMat);
+    castle.position.set(0, 2.5, 10);
+    scene.add(castle);
+
+    // a couple of bob-omb enemies
+    const bombGeo = new THREE.SphereGeometry(0.5, 16, 16);
+    const bombMat = new THREE.MeshStandardMaterial({ color: 0x000000 });
+    const bomb1 = new THREE.Mesh(bombGeo, bombMat);
+    bomb1.position.set(-3, 0.5, -5);
+    scene.add(bomb1);
+    const bomb2 = bomb1.clone();
+    bomb2.position.set(3, 0.5, -15);
+    scene.add(bomb2);
 
     const cubeGeo = new THREE.BoxGeometry(1, 1, 1);
     const cubeMat = new THREE.MeshStandardMaterial({ color: 0xff0000 });
