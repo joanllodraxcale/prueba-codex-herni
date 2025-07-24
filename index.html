@@ -1,130 +1,237 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Simple 3D Mario-like Game</title>
-    <style>
-        body {
-            margin: 0;
-            overflow: hidden;
-            background-color: #87CEEB; /* sky color */
-        }
-    </style>
+  <meta charset="UTF-8">
+  <title>Bob-omb Battlefield 3D</title>
+  <style>
+    body { margin:0; overflow:hidden; background:#87CEEB; }
+    #hud {
+      position:absolute;
+      top:10px;
+      left:10px;
+      color:#fff;
+      font-family:Arial, Helvetica, sans-serif;
+      background:rgba(0,0,0,0.3);
+      padding:5px 10px;
+      border-radius:4px;
+    }
+  </style>
 </head>
 <body>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-<script>
-    const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(
-        75,
-        window.innerWidth / window.innerHeight,
-        0.1,
-        1000
-    );
-    const renderer = new THREE.WebGLRenderer({ antialias: true });
-    renderer.setSize(window.innerWidth, window.innerHeight);
-    document.body.appendChild(renderer.domElement);
+  <div id="hud">Coins: <span id="coinCount">0</span></div>
 
-    window.addEventListener('resize', () => {
-        camera.aspect = window.innerWidth / window.innerHeight;
-        camera.updateProjectionMatrix();
-        renderer.setSize(window.innerWidth, window.innerHeight);
-    });
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/examples/js/controls/OrbitControls.js"></script>
+  <script>
+// Bob-omb Battlefield demo using Three.js
+// Scene setup
+let scene, camera, renderer, controls, clock;
+const coins = [];
+let coinCount = 0;
 
-    const light = new THREE.HemisphereLight(0xffffff, 0x444444);
-    light.position.set(0, 20, 0);
-    scene.add(light);
+init();
 
-    // create grassy ground similar to Bob-omb Battlefield
-    const groundGeo = new THREE.PlaneGeometry(200, 200);
-    const groundMat = new THREE.MeshStandardMaterial({ color: 0x55aa55 });
-    const ground = new THREE.Mesh(groundGeo, groundMat);
-    ground.rotation.x = -Math.PI / 2;
-    scene.add(ground);
+function init() {
+  scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x87CEEB); // sky blue
 
-    // simple path through the level
-    const pathGeo = new THREE.PlaneGeometry(5, 60);
-    const pathMat = new THREE.MeshStandardMaterial({ color: 0x8b4513 });
-    const path = new THREE.Mesh(pathGeo, pathMat);
-    path.rotation.x = -Math.PI / 2;
-    path.position.z = -20;
-    scene.add(path);
+  camera = new THREE.PerspectiveCamera(
+    75,
+    window.innerWidth / window.innerHeight,
+    0.1,
+    1000
+  );
+  camera.position.set(0, 30, 40);
 
-    // large mountain in the distance
-    const mountainGeo = new THREE.ConeGeometry(10, 20, 8);
-    const mountainMat = new THREE.MeshStandardMaterial({ color: 0x808080 });
-    const mountain = new THREE.Mesh(mountainGeo, mountainMat);
-    mountain.position.set(0, 10, -50);
-    scene.add(mountain);
+  renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  document.body.appendChild(renderer.domElement);
 
-    // small castle at the start area
-    const castleGeo = new THREE.BoxGeometry(10, 5, 5);
-    const castleMat = new THREE.MeshStandardMaterial({ color: 0xdddddd });
-    const castle = new THREE.Mesh(castleGeo, castleMat);
-    castle.position.set(0, 2.5, 10);
-    scene.add(castle);
+  controls = new THREE.OrbitControls(camera, renderer.domElement);
+  controls.target.set(0, 5, 0);
+  controls.maxPolarAngle = Math.PI / 2.2;
+  controls.update();
 
-    // a couple of bob-omb enemies
-    const bombGeo = new THREE.SphereGeometry(0.5, 16, 16);
-    const bombMat = new THREE.MeshStandardMaterial({ color: 0x000000 });
-    const bomb1 = new THREE.Mesh(bombGeo, bombMat);
-    bomb1.position.set(-3, 0.5, -5);
-    scene.add(bomb1);
-    const bomb2 = bomb1.clone();
-    bomb2.position.set(3, 0.5, -15);
-    scene.add(bomb2);
+  const ambient = new THREE.AmbientLight(0xffffff, 0.5);
+  scene.add(ambient);
 
-    const cubeGeo = new THREE.BoxGeometry(1, 1, 1);
-    const cubeMat = new THREE.MeshStandardMaterial({ color: 0xff0000 });
-    const character = new THREE.Mesh(cubeGeo, cubeMat);
-    character.position.y = 0.5; // half height above ground
-    scene.add(character);
+  const dir = new THREE.DirectionalLight(0xffffff, 0.8);
+  dir.position.set(50, 50, 20);
+  scene.add(dir);
 
-    camera.position.set(0, 5, 10);
-    camera.lookAt(character.position);
+  createTerrain();
+  createMountain();
+  createFloatingIsland();
+  addCoins();
+  addWarpPipes();
+  addCannons();
+  addEnemies();
 
-    const keys = {};
-    window.addEventListener('keydown', (e) => {
-        keys[e.code] = true;
-        if (e.code === 'Space' && character.position.y <= 0.51) {
-            vy = jumpPower;
-        }
-    });
-    window.addEventListener('keyup', (e) => {
-        keys[e.code] = false;
-    });
+  window.addEventListener('resize', onResize);
+  document.addEventListener('mousedown', onMouseDown);
 
-    let vy = 0;
-    const speed = 0.1;
-    const jumpPower = 0.25;
-    const gravity = 0.01;
+  clock = new THREE.Clock();
+  animate();
+}
 
-    function animate() {
-        requestAnimationFrame(animate);
+// ------- Terrain ---------
+function createTerrain() {
+  const geometry = new THREE.PlaneGeometry(1000, 1000, 200, 200);
+  const pos = geometry.attributes.position;
+  for (let i = 0; i < pos.count; i++) {
+    const x = pos.getX(i);
+    const y = pos.getY(i);
+    const noise = (Math.sin(x * 0.005) + Math.cos(y * 0.005)) * 2;
+    pos.setZ(i, noise);
+  }
+  geometry.computeVertexNormals();
 
-        if (keys['ArrowLeft']) character.position.x -= speed;
-        if (keys['ArrowRight']) character.position.x += speed;
-        if (keys['ArrowUp']) character.position.z -= speed;
-        if (keys['ArrowDown']) character.position.z += speed;
+  const texture = new THREE.TextureLoader().load('https://threejsfundamentals.org/threejs/resources/images/grasslight-big.jpg');
+  texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+  texture.repeat.set(40, 40);
+  const material = new THREE.MeshLambertMaterial({ map: texture });
+  const terrain = new THREE.Mesh(geometry, material);
+  terrain.rotation.x = -Math.PI / 2;
+  scene.add(terrain);
+}
 
-        if (character.position.y > 0.5 || vy > 0) {
-            vy -= gravity;
-        }
-        character.position.y += vy;
-        if (character.position.y < 0.5) {
-            character.position.y = 0.5;
-            vy = 0;
-        }
+// ------- Mountain --------
+function createMountain() {
+  const mountainGeo = new THREE.ConeGeometry(20, 40, 8, 1);
+  const mountainMat = new THREE.MeshPhongMaterial({ color: 0x8b7765 });
+  const mountain = new THREE.Mesh(mountainGeo, mountainMat);
+  mountain.position.set(0, 20, -80);
+  scene.add(mountain);
 
-        camera.position.x = character.position.x;
-        camera.position.z = character.position.z + 10;
-        camera.lookAt(character.position);
+  // star at the top
+  const starGeo = new THREE.SphereGeometry(1.5, 16, 16);
+  const starMat = new THREE.MeshStandardMaterial({ color: 0xffff00, emissive: 0xffff00 });
+  const star = new THREE.Mesh(starGeo, starMat);
+  star.position.set(0, 40, -80);
+  scene.add(star);
+}
 
-        renderer.render(scene, camera);
-    }
+// ------- Floating island ---
+function createFloatingIsland() {
+  const islandGeo = new THREE.BoxGeometry(20, 2, 15);
+  const islandMat = new THREE.MeshLambertMaterial({ color: 0x228B22 });
+  const island = new THREE.Mesh(islandGeo, islandMat);
+  island.position.set(40, 20, -20);
+  scene.add(island);
 
-    animate();
-</script>
+  // tree on island
+  const trunkGeo = new THREE.CylinderGeometry(0.5, 0.5, 3);
+  const trunkMat = new THREE.MeshStandardMaterial({ color: 0x8B4513 });
+  const trunk = new THREE.Mesh(trunkGeo, trunkMat);
+  trunk.position.set(40, 22, -20);
+  scene.add(trunk);
+
+  const foliageGeo = new THREE.SphereGeometry(2, 12, 12);
+  const foliageMat = new THREE.MeshStandardMaterial({ color: 0x006400 });
+  const foliage = new THREE.Mesh(foliageGeo, foliageMat);
+  foliage.position.set(40, 24.5, -20);
+  scene.add(foliage);
+
+  // rotating coin
+  const coin = createCoin();
+  coin.position.set(40, 24, -15);
+  scene.add(coin);
+  coins.push(coin);
+}
+
+// ------- Coins ---------
+function createCoin() {
+  const geo = new THREE.TorusGeometry(1, 0.3, 16, 100);
+  const mat = new THREE.MeshStandardMaterial({ color: 0xFFD700 });
+  return new THREE.Mesh(geo, mat);
+}
+
+function addCoins() {
+  for (let i = 0; i < 5; i++) {
+    const coin = createCoin();
+    coin.position.set(-5 + i * 2.5, 2, -30);
+    scene.add(coin);
+    coins.push(coin);
+  }
+}
+
+// ------- Warp pipes ------
+function addWarpPipes() {
+  const pipeGeo = new THREE.CylinderGeometry(2, 2, 5, 16, 1, true);
+  const pipeMat = new THREE.MeshStandardMaterial({ color: 0x1E8F3F });
+  const pipe = new THREE.Mesh(pipeGeo, pipeMat);
+  pipe.position.set(-30, 2.5, -10);
+  pipe.userData.isPipe = true;
+  scene.add(pipe);
+}
+
+// ------- Cannons ---------
+function addCannons() {
+  const baseGeo = new THREE.CylinderGeometry(2, 2, 2, 16);
+  const baseMat = new THREE.MeshPhongMaterial({ color: 0x333333 });
+  const base = new THREE.Mesh(baseGeo, baseMat);
+  base.position.set(25, 1, 20);
+  scene.add(base);
+
+  const barrelGeo = new THREE.SphereGeometry(1.2, 16, 16, 0, Math.PI);
+  const barrelMat = new THREE.MeshPhongMaterial({ color: 0x555555 });
+  const barrel = new THREE.Mesh(barrelGeo, barrelMat);
+  barrel.rotation.x = Math.PI / 2;
+  barrel.position.set(25, 2.5, 20);
+  scene.add(barrel);
+}
+
+// ------- Enemies ---------
+function addEnemies() {
+  // Bob-omb
+  const bombGeo = new THREE.SphereGeometry(1, 16, 16);
+  const bombMat = new THREE.MeshStandardMaterial({ color: 0x000000 });
+  const bomb = new THREE.Mesh(bombGeo, bombMat);
+  bomb.position.set(10, 1, -10);
+  scene.add(bomb);
+
+  // Goomba
+  const bodyGeo = new THREE.SphereGeometry(1.2, 16, 16);
+  const bodyMat = new THREE.MeshStandardMaterial({ color: 0x8B4513 });
+  const body = new THREE.Mesh(bodyGeo, bodyMat);
+  body.position.set(-15, 1.2, -25);
+  scene.add(body);
+  const headGeo = new THREE.SphereGeometry(0.8, 16, 16);
+  const head = new THREE.Mesh(headGeo, bodyMat);
+  head.position.set(-15, 2.5, -25);
+  scene.add(head);
+}
+
+// ------- Events ----------
+const raycaster = new THREE.Raycaster();
+const mouse = new THREE.Vector2();
+function onMouseDown(event) {
+  mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+  mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+  raycaster.setFromCamera(mouse, camera);
+  const intersects = raycaster.intersectObjects(coins, false);
+  if (intersects.length > 0) {
+    const coin = intersects[0].object;
+    scene.remove(coin);
+    coins.splice(coins.indexOf(coin), 1);
+    coinCount += 1;
+    document.getElementById('coinCount').textContent = coinCount;
+  }
+}
+
+function onResize() {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+}
+
+// ------- Animation loop --------
+function animate() {
+  requestAnimationFrame(animate);
+  const delta = clock.getDelta();
+  coins.forEach(coin => coin.rotation.y += delta * 5);
+  renderer.render(scene, camera);
+}
+  </script>
 </body>
 </html>
